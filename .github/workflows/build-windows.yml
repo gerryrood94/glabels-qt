@@ -1,0 +1,55 @@
+name: Build gLabels (Windows)
+
+on:
+  workflow_dispatch:        # lets you start it manually from the Actions tab
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: windows-2022   # the image the project's CI is known-green on
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # full history so CMake can derive the version
+
+      - name: Install Qt 6.2
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.2.*'
+          install-deps: 'true'
+          archives: 'qtbase qtsvg qttools icu qttranslations'
+
+      - name: Install optional libs via vcpkg (zlib, QR, barcodes)
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          ./vcpkg/vcpkg install pkgconf zlib libqrencode zint
+          echo "TOOLCHAIN_FILE=$(pwd)/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_ENV
+
+      - name: Configure
+        run: >
+          cmake -B build -S .
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.TOOLCHAIN_FILE }}
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Package a runnable folder
+        shell: pwsh
+        run: |
+          mkdir dist
+          copy build\glabels\Release\glabels-qt.exe dist\
+          copy build\glabels-batch\Release\glabels-batch-qt.exe dist\
+          windeployqt --release --compiler-runtime dist\glabels-qt.exe
+          copy vcpkg\installed\x64-windows\bin\*.dll dist\
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: glabels-qt-windows
+          path: dist
