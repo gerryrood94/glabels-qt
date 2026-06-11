@@ -1,19 +1,19 @@
 name: Build gLabels (Windows)
 
 on:
-  workflow_dispatch:        # lets you start it manually from the Actions tab
+  workflow_dispatch:
   push:
     branches: [ master ]
 
 jobs:
   build:
-    runs-on: windows-2022   # the image the project's CI is known-green on
+    runs-on: windows-2022
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0    # full history so CMake can derive the version
+          fetch-depth: 0
 
       - name: Install Qt 6.2
         uses: jurplel/install-qt-action@v4
@@ -28,13 +28,12 @@ jobs:
           git clone --depth 1 https://github.com/microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.sh
           ./vcpkg/vcpkg install pkgconf zlib libqrencode zint
-          echo "TOOLCHAIN_FILE=$(pwd)/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_ENV
 
       - name: Configure
         run: >
           cmake -B build -S .
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.TOOLCHAIN_FILE }}
+          "-DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
         run: cmake --build build --config Release
